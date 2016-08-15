@@ -5,6 +5,9 @@ The sin, cos, exp and log functions were written by Julien Pommier (see unmodifi
 The tan, cot, atan, atan2 are written by Tolga Mizrak.
 
 sse_mathfun_extension.h serves as an extension to sse_mathfun.h, implementing tan, cot, atan and atan2.
+It is written as an extension to sse_mathfun.h instead of modifying it, just because I didn't want
+to maintain a modified version of the original library. This way switching to a newer version of the
+original library won't be a hassle.
 
 License: zlib (same as sse_mathfun.h)
 
