@@ -301,3 +301,9 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+build.bat
+*.exe
+build_sublime.bat
+project.sublime-project
+project.sublime-workspace
+solution.sln
