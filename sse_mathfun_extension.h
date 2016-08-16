@@ -309,13 +309,13 @@ float sqrt_ps( float x )
 {
 	v4sf sse_value = _mm_set_ps1( x );
 	sse_value = _mm_sqrt_ps( sse_value );
-	return ( (float *)&sse_value )[0];
+	return _mm_cvtss_f32( sse_value );
 }
 float rsqrt_ps( float x )
 {
 	v4sf sse_value = _mm_set_ps1( x );
 	sse_value = _mm_rsqrt_ps( sse_value );
-	return ( (float *)&sse_value )[0];
+	return _mm_cvtss_f32( sse_value );
 }
 
 /* atan2 implementation using atan, used as a reference to implement atan2_ps */
@@ -349,7 +349,7 @@ float atan2_ref( float y, float x )
 
 	v4sf val = _mm_set_ps1( y / x );
 	val = atan_ps( val );
-	return offset + ( (float*)&val )[0];
+	return offset + _mm_cvtss_f32( val );
 }
 
 #ifdef _MSC_VER
