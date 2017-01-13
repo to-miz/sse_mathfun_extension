@@ -261,6 +261,7 @@ v4sf atan2_ps( v4sf y, v4sf x )
 {
 	v4sf x_eq_0 = _mm_cmpeq_ps( x, *(v4sf*)_ps_0 );
 	v4sf x_gt_0 = _mm_cmpgt_ps( x, *(v4sf*)_ps_0 );
+	v4sf x_le_0 = _mm_cmple_ps( x, *(v4sf*)_ps_0 );
 	v4sf y_eq_0 = _mm_cmpeq_ps( y, *(v4sf*)_ps_0 );
 	v4sf x_lt_0 = _mm_cmplt_ps( x, *(v4sf*)_ps_0 );
 	v4sf y_lt_0 = _mm_cmplt_ps( y, *(v4sf*)_ps_0 );
@@ -268,17 +269,16 @@ v4sf atan2_ps( v4sf y, v4sf x )
 	v4sf zero_mask = _mm_and_ps( x_eq_0, y_eq_0 );
 	v4sf zero_mask_other_case = _mm_and_ps( y_eq_0, x_gt_0 );
 	zero_mask = _mm_or_ps( zero_mask, zero_mask_other_case );
-	v4sf zero_result = _mm_setzero_ps();
 
-	v4sf pio2_mask = _mm_andnot_ps( x_eq_0, y_eq_0 );
+	v4sf pio2_mask = _mm_andnot_ps( y_eq_0, x_eq_0 );
 	v4sf pio2_mask_sign = _mm_and_ps( y_lt_0, *(v4sf*)_ps_sign_mask );
 	v4sf pio2_result = *(v4sf*)_ps_cephes_PIO2F;
 	pio2_result = _mm_xor_ps( pio2_result, pio2_mask_sign );
 	pio2_result = _mm_and_ps( pio2_mask, pio2_result );
 
-	/* don't need pi mask, since we are calculation atan_ps anyway, and that will return pi for 0 */
-	/*v4sf pi_mask = _mm_or_ps( y_eq_0, x_le_0 );
-	v4sf pi = *(v4sf*)_ps_cephes_PIF;*/
+	v4sf pi_mask = _mm_and_ps( y_eq_0, x_le_0 );
+	v4sf pi = *(v4sf*)_ps_cephes_PIF;
+	v4sf pi_result = _mm_and_ps( pi_mask, pi );
 
 	v4sf swap_sign_mask_offset = _mm_and_ps( x_lt_0, y_lt_0 );
 	swap_sign_mask_offset = _mm_and_ps( swap_sign_mask_offset, *(v4sf*)_ps_sign_mask );
@@ -296,10 +296,11 @@ v4sf atan2_ps( v4sf y, v4sf x )
 
 	/* select between zero_result, pio2_result and atan_result */
 
-	v4sf result = zero_result;
-	result = _mm_andnot_ps( zero_mask, pio2_result );
+	v4sf result = _mm_andnot_ps( zero_mask, pio2_result );
 	atan_result = _mm_andnot_ps( pio2_mask, atan_result );
+	atan_result = _mm_andnot_ps( pio2_mask, atan_result);
 	result = _mm_or_ps( result, atan_result );
+	result = _mm_or_ps( result, pi_result );
 
 	return result;
 }
