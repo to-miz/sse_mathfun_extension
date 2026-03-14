@@ -36,7 +36,7 @@ max deviation from cotf(x): 3.8147e-06 at 0.987876517942*Pi, max deviation from 
    ->> precision OK for the cot_ps <<-
 
 With atan_ps and atan2_ps you get pretty good precision, atan_ps max deviation is < 2e-7 and
-atan2_ps max deviation is < 2.5e-7
+atan2_ps max deviation is < 4.8e-7
 */
 
 /* Copyright (C) 2016 Tolga Mizrak
@@ -257,52 +257,45 @@ v4sf atan_ps( v4sf x )
 	return y;
 }
 
-v4sf atan2_ps( v4sf y, v4sf x )
-{
-	v4sf x_eq_0 = _mm_cmpeq_ps( x, *(v4sf*)_ps_0 );
-	v4sf x_gt_0 = _mm_cmpgt_ps( x, *(v4sf*)_ps_0 );
-	v4sf x_le_0 = _mm_cmple_ps( x, *(v4sf*)_ps_0 );
-	v4sf y_eq_0 = _mm_cmpeq_ps( y, *(v4sf*)_ps_0 );
-	v4sf x_lt_0 = _mm_cmplt_ps( x, *(v4sf*)_ps_0 );
-	v4sf y_lt_0 = _mm_cmplt_ps( y, *(v4sf*)_ps_0 );
+v4sf select_ps(v4sf mask, v4sf select_case, v4sf reject_case) {
+    return _mm_or_ps(_mm_and_ps(mask, select_case), _mm_andnot_ps(mask, reject_case));
+}
 
-	v4sf zero_mask = _mm_and_ps( x_eq_0, y_eq_0 );
-	v4sf zero_mask_other_case = _mm_and_ps( y_eq_0, x_gt_0 );
-	zero_mask = _mm_or_ps( zero_mask, zero_mask_other_case );
+v4sf atan2_ps(v4sf y, v4sf x) {
+    v4sf zero = _mm_setzero_ps();
 
-	v4sf pio2_mask = _mm_andnot_ps( y_eq_0, x_eq_0 );
-	v4sf pio2_mask_sign = _mm_and_ps( y_lt_0, *(v4sf*)_ps_sign_mask );
-	v4sf pio2_result = *(v4sf*)_ps_cephes_PIO2F;
-	pio2_result = _mm_xor_ps( pio2_result, pio2_mask_sign );
-	pio2_result = _mm_and_ps( pio2_mask, pio2_result );
+    v4sf x_eq_0 = _mm_cmpeq_ps(x, zero);
+    v4sf y_eq_0 = _mm_cmpeq_ps(y, zero);
+    v4sf x_lt_0 = _mm_cmplt_ps(x, zero);
+    v4sf y_lt_0 = _mm_cmplt_ps(y, zero);
 
-	v4sf pi_mask = _mm_and_ps( y_eq_0, x_le_0 );
+	// Note that pio2_mask and pi_mask are mutually exclusive due to y_eq_0.
+    v4sf pio2_mask = _mm_andnot_ps(y_eq_0, x_eq_0);
+    v4sf pi_mask = _mm_and_ps(y_eq_0, x_lt_0);
+    v4sf zero_mask = _mm_and_ps(x_eq_0, y_eq_0);
+
+	// atan case, this also handles the case of the 0 return when y == 0 && x > 0.
+    v4sf atan_result = atan_ps(_mm_div_ps(y, x));
+
+    // Offset of +-PI when x < 0.
 	v4sf pi = *(v4sf*)_ps_cephes_PIF;
-	v4sf pi_result = _mm_and_ps( pi_mask, pi );
+    v4sf offset = _mm_and_ps(x_lt_0, pi);
+    v4sf y_sign = _mm_and_ps(y, *(v4sf*)_ps_sign_mask);
+    offset = _mm_xor_ps(offset, y_sign);
+    atan_result = _mm_add_ps(atan_result, offset);
 
-	v4sf swap_sign_mask_offset = _mm_and_ps( x_lt_0, y_lt_0 );
-	swap_sign_mask_offset = _mm_and_ps( swap_sign_mask_offset, *(v4sf*)_ps_sign_mask );
+    // +-pi/2 case
+    v4sf pio2 = *(v4sf*)_ps_cephes_PIO2F;
+    v4sf pio2_sign = _mm_and_ps(y, *(v4sf*)_ps_sign_mask);
+    v4sf pio2_result = _mm_xor_ps(pio2, pio2_sign);
 
-	v4sf offset0 = _mm_setzero_ps();
-	v4sf offset1 = *(v4sf*)_ps_cephes_PIF;
-	offset1 = _mm_xor_ps( offset1, swap_sign_mask_offset );
+    // Select results.
+	v4sf result = atan_result;
+	result = select_ps(pio2_mask, pio2_result, result);
+	result = select_ps(pi_mask, pi, result);
+    result = _mm_andnot_ps(zero_mask, result);
 
-	v4sf offset = _mm_andnot_ps( x_lt_0, offset0 );
-	offset = _mm_and_ps( x_lt_0, offset1 );
-
-	v4sf arg = _mm_div_ps( y, x );
-	v4sf atan_result = atan_ps( arg );
-	atan_result = _mm_add_ps( atan_result, offset );
-
-	/* select between zero_result, pio2_result and atan_result */
-
-	v4sf result = _mm_andnot_ps( zero_mask, pio2_result );
-	atan_result = _mm_andnot_ps( pio2_mask, atan_result );
-	atan_result = _mm_andnot_ps( pio2_mask, atan_result);
-	result = _mm_or_ps( result, atan_result );
-	result = _mm_or_ps( result, pi_result );
-
-	return result;
+    return result;
 }
 
 /* for convenience of calling simd sqrt */

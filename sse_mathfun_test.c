@@ -157,7 +157,7 @@ typedef ALIGN16_BEG union {
 double frand() { return rand() / (double)RAND_MAX; }
 
 #if defined( HAVE_SYS_TIMES )
-inline double uclock_sec( void )
+inline static double uclock_sec( void )
 {
 	static double ttclk = 0.;
 	if( ttclk == 0. ) ttclk = sysconf( _SC_CLK_TCK );
@@ -773,6 +773,77 @@ void sanity_check()
 #endif  // USE_SSE2
 }
 
+float single_atan2(float y, float x) {
+    v4sf y_simd = _mm_set_ps1(y);
+    v4sf x_simd = _mm_set_ps1(x);
+    v4sf z_simd = atan2_ps(y_simd, x_simd);
+    return _mm_cvtss_f32(z_simd);
+}
+
+int float_eq(float a, float b) {
+	return fabsf(a - b) < 1e-6f;
+}
+
+int test_atan2() {
+#define REQUIRE(cond)                           \
+    do {                                        \
+        if (!(cond)) {                          \
+            printf("Test failed: %s\n", #cond); \
+            return 1;                           \
+        }                                       \
+    } while (0)
+
+    REQUIRE(single_atan2(0, 0) == 0);
+    REQUIRE(atan2_ref(0, 0) == 0);
+    REQUIRE(cephes_atan2f(0, 0) == 0);
+
+    REQUIRE(float_eq(atan2_ref(0, 1), 0));
+    REQUIRE(float_eq(cephes_atan2f(0, 1), 0));
+    REQUIRE(float_eq(single_atan2(0, 1), 0));
+    REQUIRE(float_eq(atan2f(0, 1), 0));
+
+    REQUIRE(float_eq(atan2_ref(0, 0.5f), 0));
+    REQUIRE(float_eq(cephes_atan2f(0, 0.5f), 0));
+    REQUIRE(float_eq(single_atan2(0, 0.5f), 0));
+    REQUIRE(float_eq(atan2f(0, 0.5f), 0));
+
+    REQUIRE(float_eq(atan2_ref(0, -1), PIF));
+    REQUIRE(float_eq(cephes_atan2f(0, -1), PIF));
+    REQUIRE(float_eq(single_atan2(0, -1), PIF));
+    REQUIRE(float_eq(atan2f(0, -1), PIF));
+
+    REQUIRE(float_eq(atan2_ref(0, -0.5f), PIF));
+    REQUIRE(float_eq(cephes_atan2f(0, -0.5f), PIF));
+    REQUIRE(float_eq(single_atan2(0, -0.5f), PIF));
+    REQUIRE(float_eq(atan2f(0, -0.5f), PIF));
+
+    REQUIRE(float_eq(atan2_ref(1, 0), PIO2F));
+    REQUIRE(float_eq(cephes_atan2f(1, 0), PIO2F));
+    REQUIRE(float_eq(single_atan2(1, 0), PIO2F));
+    REQUIRE(float_eq(atan2f(1, 0), PIO2F));
+
+    REQUIRE(float_eq(atan2_ref(-1, 0), -PIO2F));
+    REQUIRE(float_eq(cephes_atan2f(-1, 0), -PIO2F));
+    REQUIRE(float_eq(single_atan2(-1, 0), -PIO2F));
+    REQUIRE(float_eq(atan2f(-1, 0), -PIO2F));
+
+    REQUIRE(float_eq(atan2_ref(-1, 1), -PIF / 4));
+    REQUIRE(float_eq(cephes_atan2f(-1, 1), -PIF / 4));
+    REQUIRE(float_eq(single_atan2(-1, 1), -PIF / 4));
+    REQUIRE(float_eq(atan2f(-1, 1), -PIF / 4));
+
+    REQUIRE(float_eq(atan2_ref(1, -1), 3 * PIF / 4));
+    REQUIRE(float_eq(cephes_atan2f(1, -1), 3 * PIF / 4));
+    REQUIRE(float_eq(single_atan2(1, -1), 3 * PIF / 4));
+    REQUIRE(float_eq(atan2f(1, -1), 3 * PIF / 4));
+
+    REQUIRE(float_eq(atan2_ref(-1, -1), -3 * PIF / 4));
+    REQUIRE(float_eq(cephes_atan2f(-1, -1), -3 * PIF / 4));
+    REQUIRE(float_eq(single_atan2(-1, -1), -3 * PIF / 4));
+    REQUIRE(float_eq(atan2f(-1, -1), -3 * PIF / 4));
+    return 0;
+}
+
 int main()
 {
 #ifndef HAVE_SYS_TIMES
@@ -789,9 +860,11 @@ int main()
 	err += check_precision( 0.2, 0.7, "cot", cot_ps, cotf, cephes_cotf, 0 );
 	err += check_precision( 0.01, 0.99, "cot", cot_ps, cotf, cephes_cotf, 1 );
 	err += check_precision( -10, 10, "atan", atan_ps, atanf, cephes_atanf, 0 );
+	err += check_precision( -1, 1, "atan", atan_ps, atanf, cephes_atanf, 0 );
 	err += check_precision( -10000, 10000, "atan", atan_ps, atanf, cephes_atanf, 0 );
-	err += check_precision2( -1, 1, "atan2", atan2_ps, atan2f, cephes_atan2f, 0 );
+	err += check_precision2( -1, 1, "atan2", atan2_ps, atan2f, cephes_atan2f, 1 );
 	err += check_precision2( -10000, 10000, "atan2", atan2_ps, atan2f, cephes_atan2f, 0 );
+	err += test_atan2();
 
 	if( err ) {
 		printf( "some precision tests have failed\n" );
